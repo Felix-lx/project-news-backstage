@@ -27,6 +27,7 @@
           :on-success="handleSuccess"
           :on-preview="handlePictureCardPreview"
           :on-remove="handleRemove">
+          <!-- file-list作用是图片数据的回显 -->
           <i class="el-icon-plus"></i>
         </el-upload>
         <el-dialog :visible.sync="dialogVisible">
@@ -59,7 +60,7 @@ export default {
         content: '',
         categories: [],
         cover: [],
-        type: []
+        type: ''
       },
       categoryList: [],
       dialogImageUrl: '',
@@ -80,7 +81,7 @@ export default {
     }
   },
   methods: {
-    // 渲染categor
+    // 渲染category
     async getCategoryList () {
       const res = await this.$axios.get('/category')
       const { statusCode, data } = res.data
@@ -88,15 +89,19 @@ export default {
         this.categoryList = data.filter(item => item.id !== 999)
       }
     },
-    // 渲染文章详情
+    // 回显 渲染文章详情
     async getNewsDetail (id) {
       const res = await this.$axios.get(`/post/${id}`)
       const { statusCode, data } = res.data
       if (statusCode === 200) {
         console.log(data)
+        // 处理category和cover数据的形式，将他们变成组件需要的数组数据样式
         data.categories = data.categories.map(item => { return item.id })
         this.fileList = data.cover.map(item => {
-          return { url: this.$checkURL(item.url) }
+          return {
+            id: item.id,
+            url: this.$checkURL(item.url)
+          }
         })
         console.log(this.fileList)
         this.form = data
@@ -114,35 +119,56 @@ export default {
         }
       })
       // console.log(this.form)
-      const res = await this.$axios.post('/post', data, {
-        headers: {
-          Authorization: localStorage.getItem('token')
-        }
-      })
-      const { statusCode, message } = res.data
-      if (statusCode === 200) {
-        this.$message(message)
-        this.$router.push('/newslist')
+      // const有块级作用域，所以在外面定义
+      let url
+      if (this.newsId) {
+        url = `/post_update/${this.newsId}`
+      } else {
+        url = '/post'
       }
-      console.log(res)
+      console.log(data.title)
+      console.log(data.content)
+
+      console.log(data.categories)
+      console.log(data.cover)
+      console.log(data.type)
+
+      if (data.title && data.content && data.categories.length > 0 && data.cover.length > 0 && data.type) {
+        const res = await this.$axios.post(url, data, {
+          headers: {
+            Authorization: localStorage.getItem('token')
+          }
+        })
+        const { statusCode, message } = res.data
+        if (statusCode === 200) {
+          this.$message(message)
+          this.$router.push('/newslist')
+        }
+        console.log(res)
+      } else {
+        this.$message('请完善内容')
+      }
     },
     // 提交照片成功
-    handleSuccess (res) {
+    handleSuccess (res, file) {
       const { statusCode, data } = res
       if (statusCode === 200) {
         console.log(data)
         this.form.cover.push({
           id: data.id,
-          url: this.$axios.default.baseURL + data.url
+          url: this.$axios.defaults.baseURL + data.url
         })
+        console.log(file)
       }
     },
     // 照片移除
     handleRemove (file, fileList) {
       console.log(file, fileList)
+      this.form.cover = fileList
     },
     // 图片预览
     handlePictureCardPreview (file) {
+      console.log(file)
       this.dialogImageUrl = file.url
       this.dialogVisible = true
     }
